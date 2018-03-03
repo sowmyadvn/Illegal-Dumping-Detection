@@ -28,7 +28,6 @@ import sys
 import sys
 from scipy.misc import imread
 import matplotlib.patches as patches
-import cv2
 #sys.path.append(os.path.join(os.getcwd(),'python/'))
 sys.path.append(os.path.join('home/nvidia/darknet/','python/'))
 import darknet as dn
