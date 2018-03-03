@@ -48,7 +48,7 @@ for f in files:
         r = dn.detect(net, meta, image_path)
         print (r)
         cnt = 0
-        if r is not None:
+        if r != []:
              while cnt < len(r):
                   name = r[cnt][0]
                   if name in labels_list:
