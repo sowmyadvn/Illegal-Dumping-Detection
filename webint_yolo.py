@@ -1,8 +1,9 @@
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join,expanduser
 from PIL import Image
 from datetime import *
 from scipy.misc import imread
+from gps import *
 import os
 import time
 import argparse
@@ -16,13 +17,12 @@ import threading
 import requests
 import json
 import datetime
-import geocoder
+#import geocoder
 import glob
 import base64
 import sys
 
-#sys.path.append(os.path.join(os.getcwd(),'python/'))
-sys.path.append(os.path.join('/home/ubuntu/darknet/','python/'))
+sys.path.append(os.path.join('/home/nvidia/darknet/','python/'))
 import darknet as dn
 import pdb
 
@@ -32,15 +32,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-#sys.path.append(os.path.join(os.getcwd(),'python/'))
-
-
 classifier_list = []
 images=[]
 classifier = []
 path="/home/ubuntu/Downloads/Raw_Images"
 dstdir = "/home/ubuntu/Downloads/Classified_Images"
-
 
 data_to_send_dict = {}
 images_list_file = []
@@ -48,8 +44,6 @@ camera_list = []
 reg_station_id = ""
 threads = []
 labels_list = ['cart', 'electronics','furniture', 'mattress', 'sofa', 'trash_bags', 'trash']
-
-
 
 windowName = "CameraDemo"
 
@@ -78,31 +72,36 @@ print("Connecting to the server")
 url = "http://130.65.159.74/connect"
 date_of_connection = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
 
-#location_hotspot1 = geocoder.google("San Jose, CA")
-location_hotspot1 = geocoder.google("Fremont,CA")
+'''location_hotspot1 = geocoder.google("Fremont,CA")
 print(location_hotspot1)
 print(location_hotspot1.latlng)
 lat_lng = str((location_hotspot1.latlng)[0]) + ", " + str((location_hotspot1.latlng)[1])
 #print (lat_lng)
 #print (date_of_connection)
 #lng = (location_hotspot.latlng)[1]
+'''
+
+gpsd = gps(mode=WATCH_ENABLE)
+lat_lng = str(gpsd.fix.latitude)+","+ str(gpsd.fix.longitude)
 data_to_send_dict = {"station_id": reg_station_id,"connection_time" : date_of_connection ,"location": lat_lng}
 r = requests.post(url, data=json.dumps(data_to_send_dict), headers=headers)
 print (r.content)
 
 #Load config files
 dn.set_gpu(0)
-net = dn.load_net(b"/home/ubuntu/darknet/cfg/yolo-obj.cfg", b"/home/ubuntu/darknet/yolo-obj_40000.weights", 0)
-meta = dn.load_meta(b"/home/ubuntu/darknet/obj.data")
-
+home = expanduser("~")
+net = dn.load_net(bytes(home+ "/darknet/yolo-obj.cfg"), bytes(home + "/darknet/yolo-obj_40000.weights"), 0)
+meta = dn.load_meta(bytes(home + "/darknet/obj.data"))
+if not os.path.exists(home+'/Downloads/Raw_Images'):
+	os.makedirs(home+'/Downloads/Raw_Images');
+if not os.path.exists(home+'/Downloads/Classified_Images'):
+	os.makedirs(home+'/Downloads/Classified_Images');
 
 def main():
 	while True:
 		print (datetime.datetime.now())
-		mydir_tegra = os.path.join('/home/ubuntu/Downloads/Raw_Images/',(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
-		mydir_illegal = os.path.join('/home/ubuntu/Downloads/Classified_Images/',datetime.datetime.now().strftime('%Y-%m-%d_%H-%M'))
-		#mydir_tegra = os.path.join('/Users/sowmiteja/Desktop/Raw_Images/',datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
-                #mydir_illegal = os.path.join('/Users/sowmiteja/Desktop/Classified_Images/',datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+		mydir_tegra = os.path.join(home + '/Downloads/Raw_Images/',(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')))
+		mydir_illegal = os.path.join(home + '/Downloads/Classified_Images/',datetime.datetime.now().strftime('%Y-%m-%d_%H-%M'))
 		os.makedirs(mydir_tegra)
 		os.makedirs(mydir_illegal)
 		mydir_tegra += '/'
@@ -117,7 +116,6 @@ def main():
 		images_list_file = []
 	
 def tegra_cam(mydir_tegra):
-    #print threading.currentThread().getName(), 'Starting'
     count = 1
     file_loc = mydir_tegra + "test_image"
     print("OpenCV version: {}".format(cv2.__version__))
@@ -212,11 +210,6 @@ def read_cam(windowName, cap):
 
 def testing_illegal(mydir_tegra, mydir_illegal):
 
-	#Load config files
-	#dn.set_gpu(0)
-	#net = dn.load_net(b"/home/ubuntu/darknet/cfg/yolo-obj.cfg", b"/home/ubuntu/darknet/yolo-obj_40000.weights", 0)
-	#meta = dn.load_meta(b"/home/ubuntu/darknet/obj.data")
-
 	#Raw folder path
 	folder_raw = mydir_tegra
 	print (mydir_tegra)
@@ -226,14 +219,11 @@ def testing_illegal(mydir_tegra, mydir_illegal):
 	#Classified folder path
 	folder_classified = mydir_illegal
 	count = 0
-	#file1 = open(os.path.join(folder_classified,datetime.now().strftime("%Y%m%d-%H%M%S")+".txt"),"w")
-
-	labels_list = ['cart','electronics','furniture','mattress','sofa','trash','trash_bags']
 	font = cv2.FONT_HERSHEY_SIMPLEX
 
 	chart_colors = [(204,102,51),(18,557,220),(0,153,255),(24,150,16),(175,175,246),(172,62,59),(198,153,0)]
 	#Perform detection for every image in the files list
-	images = []
+	#images = []
 	for f in files:
 		if f.endswith(".jpg") or f.endswith(".jpeg") or f.endswith(".png"):
 			print (f)
@@ -250,14 +240,13 @@ def testing_illegal(mydir_tegra, mydir_illegal):
 					if name in labels_list:
 						i = labels_list.index(name)
 					predict = r[cnt][1]
-					print (name+":"+str(predict))
+					#print (name+":"+str(predict))
 					classifier.append(name)
 
 					x = r[cnt][2][0]
 					y = r[cnt][2][1]
 					w = r[cnt][2][2]
 					z = r[cnt][2][3]
-					#print (x, y, w, z)
 
 					x_max = int(round((2*x+w)/2))
 					x_min = int(round((2*x-w)/2))
@@ -286,6 +275,7 @@ def testing_illegal(mydir_tegra, mydir_illegal):
 				classifier_list.append(" ".join(set(classifier)))
 				count += 1
 				saving_path = folder_classified+ name +"_"+ str(count) + ".jpg"
+				print (saving_path)
 				images.append(saving_path)
 				#file1.write(name+",")
 				cv2.imwrite(saving_path,image_cv2)
@@ -296,18 +286,12 @@ def testing_illegal(mydir_tegra, mydir_illegal):
 def http_client():
 	print (images)
 	try:		
-		if (images != []):
+		#if (images != []):
 			print("Sending alert")
 			url = "http://130.65.159.74/alerting"
 			date_of_connection = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
-			#location_hotspot = geocoder.google("Mountain View,CA")
-			#location_hotspot = geocoder.google("Santa Teresa, CA")
-			#location_hotspot = geocoder.google("San Jose, CA")
-			#location_hotspot = geocoder.google("Fremont, CA")
-			#print(location_hotspot)
-			#print(location_hotspot.latlng)
 
-			lat_lng = str((location_hotspot1.latlng)[0]) + ", " + str((location_hotspot1.latlng)[1])
+			#lat_lng = str((location_hotspot1.latlng)[0]) + ", " + str((location_hotspot1.latlng)[1])
 			#print (lat_lng)
 			#print (date_of_connection)
 			#print (images)
@@ -334,8 +318,8 @@ def http_client():
 			#print (data_to_send_dict)
 			r = requests.post(url, data=json.dumps(data_to_send_dict), headers=headers)
 			print (r.content)
-		else:
-			print ("No illegal dumping detected. Not sending alert")
+		#else:
+			#print ("No illegal dumping detected. Not sending alert")
 	except KeyboardInterrupt:
 		print ('Completed')
 
